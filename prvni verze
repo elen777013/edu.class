@@ -1,0 +1,5 @@
+git init
+git remote add origin https://github.com/<elen777013>/<repo>.git
+git add .
+git commit -m "První verze webu"
+git push -u origin main
