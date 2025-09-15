@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Předprodej školních potřeb — Demo</title>
+  <style>
+    /* Základní reset a layout */
+    :root{
+      --maxw:1100px;
+      --accent:#2b6cb0;
+      --muted:#6b7280;
+      --bg:#f7fafc;
+      --card:#ffffff;
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial; margin:0; background:var(--bg); color:#0f172a; line-height:1.4}
+    .wrap{max-width:var(--maxw); margin:28px auto; padding:18px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+    header h1{font-size:1.25rem;margin:0}
+    .badge{font-size:.9rem;color:var(--muted)}
+    main{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    /* Produkty */
+    .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+    .card{background:var(--card);border-radius:10px;padding:12px;box-shadow:0 1px 6px rgba(2,6,23,0.06);display:flex;flex-direction:column;gap:8px}
+    .card img{width:100%;height:150px;object-fit:cover;border-radius:8px}
+    .card h3{margin:0;font-size:1rem}
+    .price{font-weight:700;color:var(--accent)}
+    .muted{color:var(--muted);font-size:.95rem}
+    button{background:var(--accent);color:white;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+    button.secondary{background:#e2e8f0;color:#0f172a}
+    /* Košík */
+    aside{position:relative}
+    .cart{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 1px 6px rgba(2,6,23,0.06)}
+    .cart h2{margin:0 0 8px 0;font-size:1.05rem}
+    .line{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed #e6edf6}
+    .qty{display:flex;gap:6px;align-items:center}
+    .small{font-size:.9rem}
+    .total{display:flex;justify-content:space-between;padding-top:10px;font-weight:700}
+    form.order{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+    input, textarea, select{padding:8px;border-radius:8px;border:1px solid #e2e8f0;width:100%}
+    .note{font-size:.9rem;color:var(--muted)}
+    .empty{color:var(--muted);padding:8px 0}
+    /* responsive */
+    @media (max-width:880px){
+      main{grid-template-columns:1fr; padding-bottom:60px}
+      aside{position:static}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Předprodej školních potřeb</h1>
+        <div class="badge">Sbíráme objednávky pro šk. rok — vyzvednutí 1.9.</div>
+      </div>
+      <div class="badge">Demo prototyp • bez plateb</div>
+    </header>
+
+    <main>
+      <section>
+        <h2 style="margin-top:0">Produkty</h2>
+        <div class="products" id="products"></div>
+      </section>
+
+      <aside>
+        <div class="cart" id="cart">
+          <h2>Košík</h2>
+          <div id="cart-items"></div>
+          <div class="total">
+            <div>Celkem:</div>
+            <div id="cart-total">0 Kč</div>
+          </div>
+
+          <form class="order" id="order-form" onsubmit="submitOrder(event)">
+            <label class="small">Jméno a příjmení<input required name="name" placeholder="Petra Nováková"></label>
+            <label class="small">E-mail<input required type="email" name="email" placeholder="email@priklad.cz"></label>
+            <label class="small">Telefon<input name="phone" placeholder="+420 777 123 456"></label>
+            <label class="small">Adresa pro fakturu / poznámku<textarea name="address" rows="2" placeholder="Třída, kontakt..."></textarea></label>
+            <div class="note">Toto je demo: po odeslání se vygeneruje souhrn objednávky. Pro reálné platby přidejte platební bránu.</div>
+            <button type="submit">Odeslat objednávku</button>
+            <button type="button" class="secondary" onclick="clearCart()">Vyprázdnit košík</button>
+          </form>
+          <div id="order-result" style="margin-top:10px"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+<script>
+/* --- Data: upravte produkty zde --- */
+const products = [
+  {id: "p1", title:"Set pastelek 24 ks", price: 129, img:"https://via.placeholder.com/400x300?text=Pasteleky+24"},
+  {id: "p2", title:"Studentský batoh", price: 799, img:"https://via.placeholder.com/400x300?text=Batoh"},
+  {id: "p3", title:"Sešit A5, 40 l.", price: 15, img:"https://via.placeholder.com/400x300?text=Sesit+A5"},
+  {id: "p4", title:"Peračník prázdný", price: 189, img:"https://via.placeholder.com/400x300?text=Pernik"},
+  {id: "p5", title:"Geometrická souprava", price: 99, img:"https://via.placeholder.com/400x300?text=Geometrie"},
+];
+
+/* --- Správa košíku --- */
+let cart = JSON.parse(localStorage.getItem('cart_demo')) || {};
+
+function renderProducts(){
+  const el = document.getElementById('products');
+  el.innerHTML = products.map(p => `
+    <div class="card" data-id="${p.id}">
+      <img src="${p.img}" alt="${p.title}">
+      <h3>${p.title}</h3>
+      <div class="muted">Cena: <span class="price">${p.price} Kč</span></div>
+      <div style="margin-top:auto;display:flex;gap:8px;align-items:center">
+        <input type="number" min="1" value="1" id="q_${p.id}" style="width:66px;padding:6px;border-radius:8px;border:1px solid #e2e8f0">
+        <button onclick="addToCart('${p.id}')">Přidat do košíku</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function saveCart(){ localStorage.setItem('cart_demo', JSON.stringify(cart)); renderCart(); }
+
+function addToCart(id){
+  const qtyEl = document.getElementById(`q_${id}`);
+  const qty = Math.max(1, parseInt(qtyEl?.value || 1, 10));
+  cart[id] = (cart[id]||0) + qty;
+  saveCart();
+  flashMessage("Přidáno do košíku");
+}
+
+function setQty(id, qty){
+  if(qty <= 0) delete cart[id]; else cart[id]=qty;
+  saveCart();
+}
+function removeItem(id){ delete cart[id]; saveCart(); }
+function clearCart(){ cart={}; saveCart(); document.getElementById('order-result').innerHTML=''; }
+
+/* --- Vykreslení košíku --- */
+function renderCart(){
+  const container = document.getElementById('cart-items');
+  if(!container) return;
+  const ids = Object.keys(cart);
+  if(ids.length === 0){ container.innerHTML = '<div class="empty">Košík je prázdný.</div>'; document.getElementById('cart-total').textContent = '0 Kč'; return; }
+  let html = '';
+  let total = 0;
+  ids.forEach(id=>{
+    const p = products.find(x=>x.id===id);
+    const qty = cart[id];
+    if(!p) return;
+    const sum = p.price * qty;
+    total += sum;
+    html += `<div class="line">
+      <div style="flex:1">
+        <div style="font-weight:600">${p.title}</div>
+        <div class="muted">${p.price} Kč × ${qty} = ${sum} Kč</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <div class="qty">
+          <button class="secondary" onclick="setQty('${id}', ${Math.max(0, qty-1)})">−</button>
+          <input style="width:46px;text-align:center;border-radius:6px;border:1px solid #e2e8f0" type="number" min="0" value="${qty}" onchange="setQty('${id}', parseInt(this.value||0,10))">
+          <button onclick="setQty('${id}', ${qty+1})">+</button>
+        </div>
+        <button class="secondary" onclick="removeItem('${id}')">Smazat</button>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+  document.getElementById('cart-total').textContent = formatCurrency(total);
+}
+
+/* --- Pomocné funkce --- */
+function formatCurrency(n){ return `${n.toLocaleString('cs-CZ')} Kč` }
+function flashMessage(txt){
+  const res = document.getElementById('order-result');
+  res.innerHTML = `<div style="padding:8px;border-radius:8px;background:#ecfeff">${txt}</div>`;
+  setTimeout(()=>{ if(res.innerHTML.includes(txt)) res.innerHTML=''; },2500);
+}
+
+/* --- Odeslání objednávky (demo) --- */
+function submitOrder(e){
+  e.preventDefault();
+  if(Object.keys(cart).length===0){ flashMessage('Košík je prázdný — přidejte položky.'); return; }
+
+  const form = e.target;
+  const data = {
+    name: form.name.value.trim(),
+    email: form.email.value.trim(),
+    phone: form.phone.value.trim(),
+    address: form.address.value.trim(),
+    items: [],
+    createdAt: new Date().toISOString()
+  };
+
+  for(const [id, qty] of Object.entries(cart)){
+    const p = products.find(x=>x.id===id);
+    if(!p) continue;
+    data.items.push({id, title:p.title, price:p.price, qty, sum: p.price*qty});
+  }
+  data.total = data.items.reduce((s,i)=>s+i.sum,0);
+  data.orderNumber = generateOrderNumber();
+
+  // DEMO: v místě níže byste zavolali backend / platební bránu
+  // fetch('/api/create-order', {method:'POST', body: JSON.stringify(data)})...
+  // nebo přes Stripe Checkout: vytvořit session na serveru a přesměrovat.
+
+  // Zobrazíme souhrn a nabídneme stáhnout / zkopírovat
+  const summary = renderOrderSummary(data);
+  document.getElementById('order-result').innerHTML = summary;
+  // (nemazat košík automaticky, nechte admin potvrdit)
+  // Pokud chcete košík po odeslání vymazat, odkomentujte:
+  // cart={}; saveCart();
+}
+
+function generateOrderNumber(){
+  const now = Date.now().toString(36).toUpperCase();
+  const rand = Math.floor(Math.random()*9000 + 1000).toString();
+  return `P${now.slice(-6)}-${rand}`;
+}
+
+function renderOrderSummary(data){
+  const itemsHtml = data.items.map(i=>`<li>${i.title} — ${i.qty} × ${i.price} Kč = ${i.sum} Kč</li>`).join('');
+  return `
+    <div style="margin-top:8px;padding:8px;border-radius:8px;background:#f0f9ff">
+      <strong>Objednávka odeslána (demo)</strong><br>
+      Číslo objednávky: <strong>${data.orderNumber}</strong><br>
+      Jméno: ${escapeHtml(data.name)}<br>
+      E-mail: ${escapeHtml(data.email)}<br>
+      Telefon: ${escapeHtml(data.phone)}<br>
+      Poznámka/adresa: ${escapeHtml(data.address)}<br>
+      <div style="margin-top:8px"><strong>Položky:</strong><ul>${itemsHtml}</ul></div>
+      <div style="font-weight:700">Celkem: ${formatCurrency(data.total)}</div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button onclick='downloadOrder(${JSON.stringify(escapeHtml(JSON.stringify(data)).replaceAll("'", "\\'"))})'>Stáhnout souhrn (.txt)</button>
+        <button onclick='copyOrderSummary()' class="secondary">Kopírovat do schránky</button>
+      </div>
+    </div>
+  `;
+}
+
+/* jednoduché escapování do HTML */
+function escapeHtml(str){ if(!str) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+function downloadOrder(jsonStrEscaped){
+  // Pozn.: máme JSON string v escaped podobě; jednoduše vytvoříme soubor
+  try{
+    const data = JSON.parse(JSON.parse(jsonStrEscaped));
+    const txt = [
+      `Objednávka: ${data.orderNumber}`,
+      `Datum: ${data.createdAt}`,
+      `Jméno: ${data.name}`,
+      `E-mail: ${data.email}`,
+      `Telefon: ${data.phone}`,
+      `Adresa/poznámka: ${data.address}`,
+      ``,
+      `Položky:`,
+      ...data.items.map(i=>`- ${i.title}  |  ${i.qty} × ${i.price} Kč  =  ${i.sum} Kč`),
+      ``,
+      `Celkem: ${data.total} Kč`,
+    ].join('\n');
+    const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `objednavka_${data.orderNumber}.txt`; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){ alert('Chyba při vytváření souboru.'); console.error(e); }
+}
+
+function copyOrderSummary(){
+  const node = document.getElementById('order-result');
+  navigator.clipboard?.writeText(node.innerText || node.textContent || '').then(()=>{ flashMessage('Souhrn zkopírován do schránky'); }, ()=>{ flashMessage('Nelze zkopírovat — zkuste ručně'); });
+}
+
+/* --- Inicializace --- */
+renderProducts();
+renderCart();
+</script>
+</body>
+</html>
